@@ -14,7 +14,7 @@ This is an attempt at that. It works perfectly fine on my machine. **However**:
 1. It has a ton of things hardcoded and likely needs to be modified to work on your computer.
 2. Sets colors via shell commands, which is not ideal.
 3. Runs as root because I'm lazy.
-4. Has no intended future use beyond that.
+4. Has no intended future use beyond my machine.
 
 #### Requirements
 1. Install Python requirements by running `sudo pip3 install requirements.txt`.
@@ -23,7 +23,7 @@ This is an attempt at that. It works perfectly fine on my machine. **However**:
 
 
 #### Usage
-1. Modify any constants in rgb_controller.py you might desire.
+1. Modify any constants in `rgb_controller.py` you might desire.
 2. Run:
 - `python3 rgb_controller.py aura` to set the Aura led strip color or
 - `python3 rgb_controller.py kraken <interval>` to set the CPU cooler color periodically.
@@ -33,7 +33,7 @@ Interval is any positive number and represents the time spent sleeping between c
 
 #### Systemctl service
 To run Kraken color loop in the background (starting on boot), you might want to add systemd service like this one:
-```
+```ini
 [Unit]
 Description=NZXT Kraken AIO liquid cooler RGB controller.
 
@@ -46,7 +46,7 @@ Restart=on-failure
 WantedBy=default.target
 ```
 Save it as `/etc/systemd/system/kraken_controller.service`, then run:
-```
+```shell script
 sudo systemctl daemon-reload
 sudo systemctl start/enable kraken_controller
 ```
@@ -55,3 +55,17 @@ Additionally, to set Aura brightness every 2 minutes, add a cronjob:
 ```
 */2 * * * * /usr/bin/python3 /opt/rgb_controller/rgb_controller.py aura
 ```  
+
+If you want to set aura colors the moment OS boots up, add another systemd service:
+```ini
+[Unit]
+Description=Aura sync color set on boot.
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/rgb_controller/
+ExecStart=/usr/bin/python3 /opt/rgb_controller/rgb_controller.py aura
+
+[Install]
+WantedBy=default.target
+```

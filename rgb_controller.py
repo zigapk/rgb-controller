@@ -6,12 +6,13 @@ import subprocess
 
 # Expected CPU temperature range.
 CPU_TEMP_RANGE_MAX = 53
-CPU_TEMP_RANGE_MIN = 33
+CPU_TEMP_RANGE_MIN = 38
 
 # Desired color scheme.
 # CPU_TEMP_COLOR_MAX = 0xD500F9
 CPU_TEMP_COLOR_MAX = 0xff0000
 CPU_TEMP_COLOR_MIN = 0xffffff
+AURA_COLOR = 0x7C4DFF
 KRAKEN_LOGO_COLOR = CPU_TEMP_COLOR_MIN
 
 # Sunset and sunrise time in hours past midnight constants.
@@ -20,7 +21,7 @@ TIME_SUNSET = 19.5  # 7:30 pm
 
 # Min and max brightness during the day.
 BRIGHTNESS_AURA_MIN = 0.01
-BRIGHTNESS_AURA_MAX = 0.65
+BRIGHTNESS_AURA_MAX = 0.35
 BRIGHTNESS_KRAKEN_MIN = 0.25
 BRIGHTNESS_KRAKEN_MAX = 1.0
 
@@ -110,40 +111,42 @@ def get_cpu_temperature() -> float:
                     return feature.get_value()
 
 
-def get_brightness(kraken=False, aura=False) -> float:
+def get_brightness() -> float:
     """
-    Calculates brightness based on the time of day.
-    Linear scale between SUNRISE and SUNSET is used.
-    :return: Brightness between BRIGHTNESS_MIN and BRIGHTNESS_MAX.
+    Calculate brightness ratio based on the time of day.
+    :return: Brightness ratio between 0 and 1 (1 at mid_day and 0 during the night)
     """
-
-    # check arguments
-    if not kraken and not aura:
-        raise
-    if aura and kraken:
-        raise
-
-    brightness_min = BRIGHTNESS_KRAKEN_MIN if kraken else BRIGHTNESS_AURA_MIN
-    brightness_max = BRIGHTNESS_KRAKEN_MAX if kraken else BRIGHTNESS_AURA_MAX
-
     dt = datetime.now()
     hours = dt.hour + dt.minute / 60
 
-    # return minimal brightness over night
     if hours <= TIME_SUNRISE or hours >= TIME_SUNSET:
-        return brightness_min
+        return 0
 
     # calculate mid_day time (does not necessarily match noon)
     mid_day = (TIME_SUNRISE + TIME_SUNSET) / 2
 
-    if hours <= mid_day:
-        # morning
-        ratio = (hours - TIME_SUNRISE) / (mid_day - TIME_SUNRISE)
-        return ratio * (brightness_max - brightness_min) + brightness_min
+    if hours < mid_day:
+        return (hours - TIME_SUNRISE) / (mid_day - TIME_SUNRISE)
     else:
-        # afternoon
-        ratio = (hours - mid_day) / (TIME_SUNSET - mid_day)
-        return ratio * (brightness_max - brightness_min) + brightness_min
+        return 1 - (hours - mid_day) / (TIME_SUNSET - mid_day)
+
+
+def get_kraken_brightness() -> float:
+    """
+    Calculates kraken brightness based on the time of day and BRIGHTNESS_KRAKEN_MIN and BRIGHTNESS_KRAKEN_MAX params.
+    :return: Kraken brightness (float).
+    """
+    ratio = get_brightness()
+    return BRIGHTNESS_KRAKEN_MIN + ratio * (BRIGHTNESS_KRAKEN_MAX - BRIGHTNESS_KRAKEN_MIN)
+
+
+def get_aura_brightness() -> float:
+    """
+    Calculates AuraSync brightness based on the time of day and BRIGHTNESS_AURA_MIN and BRIGHTNESS_AURA_MAX params.
+    :return: Aura brightness (float).
+    """
+    ratio = get_brightness()
+    return BRIGHTNESS_AURA_MIN + ratio * (BRIGHTNESS_AURA_MAX - BRIGHTNESS_AURA_MIN)
 
 
 def get_color() -> int:
@@ -155,13 +158,13 @@ def get_color() -> int:
     """
 
     # cpu temperature in C
-    temp = get_cpu_temperature()
+    temperature = get_cpu_temperature()
 
     # relative distance between MIN and MAX temperature
-    ratio = (temp - CPU_TEMP_RANGE_MIN) / (CPU_TEMP_RANGE_MAX - CPU_TEMP_RANGE_MIN)
+    ratio = (temperature - CPU_TEMP_RANGE_MIN) / (CPU_TEMP_RANGE_MAX - CPU_TEMP_RANGE_MIN)
 
     # clip ratio between 0 and 1
-    ratio = min(1, max(0, ratio))
+    ratio = min(1.0, max(0.0, ratio))
 
     # get color components
     r_min, g_min, b_min = hex_to_rgb(CPU_TEMP_COLOR_MIN)
@@ -190,7 +193,7 @@ def run_kraken(interval: float):
         r, g, b = hex_to_rgb(ring_hex_color)
 
         # calculate brightness
-        brightness = get_brightness(kraken=True)
+        brightness = get_kraken_brightness()
 
         # apply brightness
         r *= brightness
@@ -205,7 +208,7 @@ def run_kraken(interval: float):
         r, g, b = hex_to_rgb(logo_hex_color)
 
         # calculate logo brightness
-        brightness = get_brightness(kraken=True)
+        brightness = get_kraken_brightness()
 
         # apply brightness
         r *= brightness
@@ -227,11 +230,11 @@ def run_aura():
     :return:
     """
     # use main color for aura
-    hex_color = CPU_TEMP_COLOR_MIN
+    hex_color = AURA_COLOR
     r, g, b = hex_to_rgb(hex_color)
 
     # calculate brightness
-    brightness = get_brightness(aura=True)
+    brightness = get_aura_brightness()
 
     # apply brightness
     r *= brightness
