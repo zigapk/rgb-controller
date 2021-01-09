@@ -2,17 +2,18 @@ from datetime import datetime
 import time
 import sensors
 import sys
-import subprocess
+from openrgb import OpenRGBClient
+from openrgb.utils import RGBColor, DeviceType
+from openrgb.orgb import Device
 
 # Expected CPU temperature range.
 CPU_TEMP_RANGE_MAX = 53
 CPU_TEMP_RANGE_MIN = 38
 
 # Desired color scheme.
-# CPU_TEMP_COLOR_MAX = 0xD500F9
 CPU_TEMP_COLOR_MAX = 0xff0000
-CPU_TEMP_COLOR_MIN = 0xffffff
-AURA_COLOR = 0x7C4DFF
+CPU_TEMP_COLOR_MIN = 0x9575CD
+AURA_COLOR = 0x651FFF
 KRAKEN_LOGO_COLOR = CPU_TEMP_COLOR_MIN
 
 # Sunset and sunrise time in hours past midnight constants.
@@ -68,33 +69,19 @@ def rgb_to_hex(r: float, g: float, b: float) -> int:
     return hex_color
 
 
-def set_aura_static_color(hex_color: int):
+def validate_color(r: float, g: float, b: float) -> tuple:
     """
-    Sets Aura Sync color to static using OpenRGB binary via shell interface.
-    :param hex_color: Hex color to set.
+    Rounds the color components into ints and makes sure they are between 0 and 255.
+    :param r: Red.
+    :param g: Green.
+    :param b: Blue.
     :return:
     """
-    cmd = ['OpenRGB', '-d', '0', '-c', '{0:06X}'.format(hex_color)]
-    subprocess.run(cmd)
-
-
-def set_kraken_static_color(hex_color: int, ring=False, logo=False):
-    """
-    Sets NZXT Kraken color to static using liquidctl via shell interface.
-    :param logo: Set logo color.
-    :param ring: Set ring color.
-    :param hex_color:
-    :return:
-    """
-    if ring and logo:
-        cmd = ['liquidctl', 'set', 'sync', 'color', 'fixed', '{0:06X}'.format(hex_color)]
-        subprocess.run(cmd)
-    elif ring:
-        cmd = ['liquidctl', 'set', 'ring', 'color', 'fixed', '{0:06X}'.format(hex_color)]
-        subprocess.run(cmd)
-    elif logo:
-        cmd = ['liquidctl', 'set', 'logo', 'color', 'fixed', '{0:06X}'.format(hex_color)]
-        subprocess.run(cmd)
+    r, g, b = round(r), round(g), round(b)
+    r = max(0, min(255, r))
+    g = max(0, min(255, g))
+    b = max(0, min(255, b))
+    return r, g, b
 
 
 def get_cpu_temperature() -> float:
@@ -178,14 +165,26 @@ def get_color() -> int:
     return rgb_to_hex(r, g, b)
 
 
-def run_kraken(interval: float):
+def loop(interval: float, mod_aura: int):
     """
     Sets cooler color in a loop. Takes time of day and CPU temperature into account.
     :param interval: Time between cycles in seconds.
+    :param mod_aura: How many kraken cycles pass between each aura cycle.
     :return:
     """
     # init sensors
     sensors.init()
+
+    # init openrgb client
+    client = OpenRGBClient()
+    kraken = client.get_devices_by_type(DeviceType.LEDSTRIP)[0]  # weird type for a COOLER, I know
+    ring = kraken.zones[1]
+    logo = kraken.zones[2]
+    aura = client.get_devices_by_type(DeviceType.MOTHERBOARD)[0]
+    aura.zones[1].resize(120)
+
+    # count kraken cycles
+    count = 0
 
     while True:
         # calculate ring color based on CPU temperature
@@ -200,8 +199,11 @@ def run_kraken(interval: float):
         g *= brightness
         b *= brightness
 
+        # round to int
+        r, g, b = validate_color(r, g, b)
+
         # set kraken ring color
-        set_kraken_static_color(rgb_to_hex(r, g, b), ring=True)
+        ring.set_color(RGBColor(r, g, b))
 
         # read logo color
         logo_hex_color = KRAKEN_LOGO_COLOR
@@ -215,18 +217,27 @@ def run_kraken(interval: float):
         g *= brightness
         b *= brightness
 
+        # round to int
+        r, g, b = validate_color(r, g, b)
+
         # set logo color
-        set_kraken_static_color(rgb_to_hex(r, g, b), logo=True)
+        logo.set_color(RGBColor(r, g, b))
+
+        # set aura color if needed
+        if count % mod_aura == 0:
+            set_aura_color(aura)
+            count = 0
 
         # sleep for a predefined amount of time
         if interval < 0:
             return
         time.sleep(interval)
+        count += 1
 
 
-def run_aura():
+def set_aura_color(aura: Device):
     """
-    Sets the Aura Sync color and brightness based on the current time of day.
+    Sets Aura color once.
     :return:
     """
     # use main color for aura
@@ -241,37 +252,20 @@ def run_aura():
     g *= brightness
     b *= brightness
 
+    # round to int
+    r, g, b = validate_color(r, g, b)
     # set aura sync color
-    set_aura_static_color(rgb_to_hex(r, g, b))
-
-
-def refuse_to_work():
-    """
-    A dummy panic function.
-    :return:
-    """
-    print('Invalid arguments, read the documentation first.')
-    sys.exit(1)
+    aura.set_color(RGBColor(r, g, b))
 
 
 def main():
-    if len(sys.argv) < 2:
-        refuse_to_work()
+    if len(sys.argv) < 3:
+        print('Invalid arguments, read the documentation first.')
+        sys.exit(1)
 
-    cmd = sys.argv[1]
-
-    if cmd == 'kraken':
-        if len(sys.argv) < 3:
-            refuse_to_work()
-
-        # run kraken loop
-        interval = float(sys.argv[2])
-        run_kraken(interval)
-
-    elif cmd == 'aura':
-        run_aura()
-    else:
-        refuse_to_work()
+    interval_kraken = float(sys.argv[1])
+    interval_aura = float(sys.argv[2])
+    loop(interval_kraken, round(interval_aura / interval_kraken))
 
 
 if __name__ == '__main__':

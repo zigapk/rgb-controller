@@ -1,0 +1,11 @@
+[Unit]
+Description=NZXT Kraken AIO liquid cooler RGB controller.
+After=openrgb.service
+
+[Service]
+WorkingDirectory=/opt/rgb_controller/
+ExecStart=/usr/bin/python3 /opt/rgb_controller/rgb_controller.py 0.1 10
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

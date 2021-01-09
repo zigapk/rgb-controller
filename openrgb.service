@@ -1,0 +1,10 @@
+[Unit]
+Description=OpenRGB server.
+
+[Service]
+WorkingDirectory=/opt/rgb_controller/
+ExecStart=/usr/bin/OpenRGB --server
+Restart=on-failure
+
+[Install]
+WantedBy=default.target

@@ -1,2 +1,2 @@
 pysensors
-liquidctl
+openrgb-python
