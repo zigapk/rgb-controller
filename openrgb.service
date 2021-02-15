@@ -2,6 +2,7 @@
 Description=OpenRGB server.
 
 [Service]
+User=root
 WorkingDirectory=/opt/rgb_controller/
 ExecStart=/usr/bin/OpenRGB --server
 Restart=on-failure
