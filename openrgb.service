@@ -3,8 +3,8 @@ Description=OpenRGB server.
 
 [Service]
 User=root
-WorkingDirectory=/opt/rgb_controller/
-ExecStart=/usr/bin/OpenRGB --server
+WorkingDirectory=/opt/rgb-controller/
+ExecStart=/usr/bin/openrgb --server
 Restart=on-failure
 
 [Install]
