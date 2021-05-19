@@ -21,7 +21,7 @@ This is an attempt at that. It works perfectly fine on my machine. **However**:
 #### Requirements
 
 1. Install Python requirements by running `sudo pip3 install requirements.txt`.
-2. Install [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB). I've build it from source.
+2. Install [OpenRGB](https://gitlab.com/CalcProgrammer1/OpenRGB). I've built it from source.
 3. Python 3. This only applies if you live under a rock. Though I wouldn't blame you after the 2020 we've had.
 
 #### Usage
